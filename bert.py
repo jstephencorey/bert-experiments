@@ -8,6 +8,8 @@ class BertModel(nn.Module):
 
 
 
+def s():
+  print("hi")
 
 
 
