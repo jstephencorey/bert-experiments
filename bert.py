@@ -8,15 +8,16 @@ import numpy as np
 
 class Embedding(nn.Module):
 
-    def __init__(self, d_model, vocab_length, sequence_length) -> None:
+    def __init__(self, d_model, vocab_length, sequence_length, device) -> None:
         super().__init__()
         self.tok_embed = nn.Embedding(vocab_length, d_model)  # token embedding
         self.pos_embed = nn.Embedding(sequence_length, d_model)  # position embedding
         self.norm = nn.LayerNorm(d_model)
+        self.device = device
 
     def forward(self, x):
         seq_len = x.size(1)
-        pos = torch.arange(seq_len, dtype=torch.long)
+        pos = torch.arange(seq_len, dtype=torch.long).to(self.device)
         pos = pos.unsqueeze(0).expand_as(x)  # (seq_len,) -> (batch_size, seq_len)
         embedding = self.tok_embed(x) + self.pos_embed(pos)
         return self.norm(embedding)
@@ -108,9 +109,9 @@ class BertModel(nn.Module):
 
     def __init__(self, d_model = 512, vocab_length = 30, sequence_length = 256, 
                     num_layers = 3, feed_forward_dimensions = 1024, attention_heads = 8,
-                    attention_qkv_dims =  128, dropout = 0.1, pad_idx = 3, device = "CPU") -> None:
+                    attention_qkv_dims =  128, dropout = 0.1, pad_idx = 3, device = "cpu") -> None:
         super().__init__()
-        self.embedding = Embedding(d_model, vocab_length, sequence_length)
+        self.embedding = Embedding(d_model, vocab_length, sequence_length, device)
         self.encoder_layers = nn.ModuleList([EncoderLayer(d_model, feed_forward_dimensions, attention_heads, attention_qkv_dims, dropout)
                                 for _ in range(num_layers)])
         self.activation = nn.GELU()
@@ -124,25 +125,16 @@ class BertModel(nn.Module):
         self.decoder.weight = embed_weight
         self.decoder_bias = nn.Parameter(torch.zeros(n_vocab))
 
-
     def forward(self, x):
         output = self.embedding(x)
         attn_mask = get_attn_pad_mask(x,x)
         for layer in self.encoder_layers:
            output, _ = layer(output, attn_mask)
-        # print(output.size())
 
         output = self.norm(self.activation(self.linear(output)))
         logits_lm = self.decoder(output) + self.decoder_bias
 
         return logits_lm
-
-
-
-def s():
-  print("hi")
-
-
 
 if __name__ == "__main__":
     bert_model = BertModel()
